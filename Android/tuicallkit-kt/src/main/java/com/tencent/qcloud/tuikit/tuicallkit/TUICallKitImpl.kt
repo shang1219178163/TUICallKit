@@ -96,12 +96,16 @@ class TUICallKitImpl private constructor(context: Context) : TUICallKit(), ITUIN
         val params = CallParams()
         params.offlinePushInfo = OfflinePushInfoConfig.createOfflinePushInfo(context)
         params.timeout = Constants.SIGNALING_MAX_TIME
-        groupCall(groupId, userIdList, callMediaType, params, null)
+        groupCall(groupId, userIdList, callMediaType, true, params, null)
     }
 
     override fun groupCall(
-        groupId: String, userIdList: List<String?>?, callMediaType: TUICallDefine.MediaType,
-        params: CallParams?, callback: Callback?
+        groupId: String,
+        userIdList: List<String?>?,
+        callMediaType: TUICallDefine.MediaType,
+        isSingleChat: Boolean,
+        params: CallParams?,
+        callback: Callback?
     ) {
         TUILog.i(
             TAG, "TUICallKit groupCall{groupId:${groupId}, userIdList:${userIdList}, callMediaType:${callMediaType}, " +
@@ -109,7 +113,7 @@ class TUICallKitImpl private constructor(context: Context) : TUICallKit(), ITUIN
         )
         callingBellFeature = CallingBellFeature(context)
         callingKeepAliveFeature = CallingKeepAliveFeature(context)
-        CallEngineManager.instance.groupCall(groupId, userIdList, callMediaType!!, params, object : Callback {
+        CallEngineManager.instance.groupCall(groupId, userIdList, callMediaType!!, isSingleChat, params, object : Callback {
             override fun onSuccess() {
                 initAudioPlayDevice()
                 var intent = Intent(context, CallKitActivity::class.java)

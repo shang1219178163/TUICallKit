@@ -62,7 +62,9 @@ abstract class TUICallKit {
      */
     open fun groupCall(
         groupId: String, userIdList: List<String?>?,
-        callMediaType: TUICallDefine.MediaType, params: CallParams?,
+        callMediaType: TUICallDefine.MediaType,
+        isSingleChat: Boolean,
+        params: CallParams?,
         callback: TUICommonDefine.Callback?
     ) {
     }

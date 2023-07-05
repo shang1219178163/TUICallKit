@@ -93,8 +93,12 @@ class CallEngineManager private constructor(context: Context) {
     }
 
     fun groupCall(
-        groupId: String?, userIdList: List<String?>?, callMediaType: TUICallDefine.MediaType,
-        params: TUICallDefine.CallParams?, callback: TUICommonDefine.Callback?
+        groupId: String?,
+        userIdList: List<String?>?,
+        callMediaType: TUICallDefine.MediaType,
+        isSingleChat: Boolean = false,
+        params: TUICallDefine.CallParams?,
+        callback: TUICommonDefine.Callback?
     ) {
         if (TextUtils.isEmpty(groupId)) {
             TUILog.e(TAG, "groupCall failed, groupId is empty")
@@ -138,7 +142,11 @@ class CallEngineManager private constructor(context: Context) {
                                 }
                             }
                             TUICallState.instance.mediaType.set(callMediaType)
-                            TUICallState.instance.scene.set(TUICallDefine.Scene.GROUP_CALL)
+                            if (isSingleChat && TUICallState.instance.remoteUserList.size == 1) {
+                                TUICallState.instance.scene.set(TUICallDefine.Scene.SINGLE_CALL)
+                            } else {
+                                TUICallState.instance.scene.set(TUICallDefine.Scene.GROUP_CALL)
+                            }
                             TUICallState.instance.groupId.set(groupId)
                             TUICallState.instance.roomId.set(roomId)
 
