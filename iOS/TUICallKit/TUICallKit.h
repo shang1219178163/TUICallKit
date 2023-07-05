@@ -64,9 +64,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)groupCall:(NSString *)groupId
        userIdList:(NSArray<NSString *> *)userIdList
     callMediaType:(TUICallMediaType)callMediaType
+     isSingleChat:(BOOL)isSingleChat
            params:(TUICallParams *)params
              succ:(TUICallSucc __nullable)succ
-             fail:(TUICallFail __nullable)fail NS_SWIFT_NAME(groupCall(groupId:userIdList:callMediaType:params:succ:fail:));
+             fail:(TUICallFail __nullable)fail NS_SWIFT_NAME(groupCall(groupId:userIdList:callMediaType:isSingleChat:params:succ:fail:));
 
 /**
  * 加入群组中已有的音视频通话

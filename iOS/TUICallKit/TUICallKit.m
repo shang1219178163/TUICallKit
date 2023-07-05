@@ -46,6 +46,7 @@ static NSString * const TUI_CALLING_BELL_KEY = @"CallingBell";
 @property (nonatomic, assign) NSInteger totalTime;
 @property (nonatomic, assign) BOOL needContinuePlaying;
 @property (nonatomic, copy) NSString *groupID;
+@property (nonatomic, assign) BOOL isSingleChat;
 
 @end
 
@@ -141,12 +142,19 @@ callMediaType:(TUICallMediaType)callMediaType
 
 - (void)groupCall:(NSString *)groupId userIdList:(NSArray<NSString *> *)userIdList callMediaType:(TUICallMediaType)callMediaType {
     TUILog(@"TUICallKit - groupCall, groupId:%@, userIdList:%@, callMediaType:%ld", groupId, userIdList, callMediaType);
-    [self groupCall:groupId userIdList:userIdList callMediaType:callMediaType params:[self getCallParams] succ:nil fail:nil];
+    [self groupCall:groupId
+         userIdList:userIdList
+      callMediaType:callMediaType
+       isSingleChat:true
+             params:[self getCallParams]
+               succ:nil
+               fail:nil];
 }
 
 - (void)groupCall:(NSString *)groupId
        userIdList:(NSArray<NSString *> *)userIdList
     callMediaType:(TUICallMediaType)callMediaType
+     isSingleChat:(BOOL)isSingleChat
            params:(TUICallParams *)params
              succ:(TUICallSucc __nullable)succ
              fail:(TUICallFail __nullable)fail {
@@ -191,9 +199,10 @@ callMediaType:(TUICallMediaType)callMediaType
         }
         return;
     }
-    
+
     self.groupID = groupId;
     self.currentCallingType = callMediaType;
+    self.isSingleChat = isSingleChat;
     self.currentCallingRole = TUICallRoleCall;
     __weak typeof(self) weakSelf = self;
     [[TUICallEngine createInstance] groupCall:groupId
@@ -306,26 +315,26 @@ callMediaType:(TUICallMediaType)callMediaType
     if(!(filePath && [filePath isKindOfClass:NSString.class] && filePath.length > 0)) {
         return;
     }
-    
+
     if ([filePath hasPrefix:@"http"]) {
         NSURLSession *session = [NSURLSession sharedSession];
         NSURLSessionDownloadTask *downloadTask = [session downloadTaskWithURL:[NSURL URLWithString:filePath]
                                                             completionHandler:^(NSURL * _Nullable location,
                                                                                 NSURLResponse * _Nullable response,
                                                                                 NSError * _Nullable error) {
-            if (error != nil) {
-                return;
-            }
-            
-            if (location != nil) {
-                NSString *oldBellFilePath = [NSUserDefaults.standardUserDefaults objectForKey:TUI_CALLING_BELL_KEY];
-                [[NSFileManager defaultManager] removeItemAtPath:oldBellFilePath error:nil];
-                NSString *filePathStr = [[NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) lastObject] stringByAppendingPathComponent:response.suggestedFilename];
-                [[NSFileManager defaultManager] moveItemAtURL:location toURL:[NSURL fileURLWithPath:filePathStr] error:nil];
-                [NSUserDefaults.standardUserDefaults setObject:filePathStr ?: @"" forKey:TUI_CALLING_BELL_KEY];
-                [NSUserDefaults.standardUserDefaults synchronize];
-            }
-        }];
+                                                                if (error != nil) {
+                                                                    return;
+                                                                }
+
+                                                                if (location != nil) {
+                                                                    NSString *oldBellFilePath = [NSUserDefaults.standardUserDefaults objectForKey:TUI_CALLING_BELL_KEY];
+                                                                    [[NSFileManager defaultManager] removeItemAtPath:oldBellFilePath error:nil];
+                                                                    NSString *filePathStr = [[NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) lastObject] stringByAppendingPathComponent:response.suggestedFilename];
+                                                                    [[NSFileManager defaultManager] moveItemAtURL:location toURL:[NSURL fileURLWithPath:filePathStr] error:nil];
+                                                                    [NSUserDefaults.standardUserDefaults setObject:filePathStr ?: @"" forKey:TUI_CALLING_BELL_KEY];
+                                                                    [NSUserDefaults.standardUserDefaults synchronize];
+                                                                }
+                                                            }];
         [downloadTask resume];
     } else {
         [NSUserDefaults.standardUserDefaults setObject:filePath forKey:TUI_CALLING_BELL_KEY];
@@ -373,7 +382,7 @@ callMediaType:(TUICallMediaType)callMediaType
 
 - (void)onError:(int)code message:(NSString * _Nullable)message {
     NSString *toast = [NSString stringWithFormat:@"Error code: %d, Message: %@", code, message];
-    
+
     if (code == ERR_ROOM_ENTER_FAIL) {
         [self makeToast:toast duration:3 position:TUICSToastPositionCenter];
     } else if(code == ERROR_REQUEST_REPEATED) {
@@ -385,12 +394,12 @@ callMediaType:(TUICallMediaType)callMediaType
 
 - (void)onUserJoin:(nonnull NSString *)userId {
     CallingUserModel *userModel = [TUICallingUserManager getUser:userId];
-    
+
     if (userModel) {
         [self.callingViewManager userEnter:userModel];
         return;
     }
-    
+
     __weak typeof(self) weakSelf = self;
     [[V2TIMManager sharedInstance] getUsersInfo:@[userId] succ:^(NSArray<V2TIMUserFullInfo *> *infoList) {
         __strong typeof(self) strongSelf = weakSelf;
@@ -402,7 +411,7 @@ callMediaType:(TUICallMediaType)callMediaType
         [strongSelf.callingViewManager userEnter:userModel];
         [TUICallingUserManager cacheUser:userModel];
     } fail:nil];
-    
+
 }
 
 - (void)onUserLeave:(nonnull NSString *)userId {
@@ -423,14 +432,14 @@ callMediaType:(TUICallMediaType)callMediaType
 
 - (void)onUserAudioAvailable:(nonnull NSString *)userId isAudioAvailable:(BOOL)isAudioAvailable {
     CallingUserModel *userModel = [TUICallingUserManager getUser:userId];
-    
+
     if (userModel) {
         userModel.isEnter = YES;
         userModel.isAudioAvailable = isAudioAvailable;
         [self.callingViewManager updateUser:userModel];
         return;
     }
-    
+
     __weak typeof(self) weakSelf = self;
     [[V2TIMManager sharedInstance] getUsersInfo:@[userId] succ:^(NSArray<V2TIMUserFullInfo *> *infoList) {
         __strong typeof(self) strongSelf = weakSelf;
@@ -450,18 +459,18 @@ callMediaType:(TUICallMediaType)callMediaType
 
 - (void)onUserVideoAvailable:(nonnull NSString *)userId isVideoAvailable:(BOOL)isVideoAvailable {
     CallingUserModel *userModel = [TUICallingUserManager getUser:userId];
-    
+
     if (userModel) {
         userModel.isEnter = YES;
         userModel.isVideoAvailable = isVideoAvailable;
         [self.callingViewManager updateUser:userModel];
         return;
     }
-    
+
     __weak typeof(self) weakSelf = self;
     [[V2TIMManager sharedInstance] getUsersInfo:@[userId] succ:^(NSArray<V2TIMUserFullInfo *> *infoList) {
         __strong typeof(self) strongSelf = weakSelf;
-        
+
         CallingUserModel *userModel = [TUICallingUserManager getUser:userId];
         if (!userModel) {
             V2TIMUserFullInfo *userInfo = [infoList firstObject];
@@ -478,7 +487,7 @@ callMediaType:(TUICallMediaType)callMediaType
 
 - (void)onUserVoiceVolumeChanged:(nonnull NSDictionary<NSString *, NSNumber *> *)volumeMap {
     NSArray *keyArray = volumeMap.allKeys;
-    
+
     for (NSString *userId in keyArray) {
         CallingUserModel *userModel = [TUICallingUserManager getUser:userId];
         if (userModel) {
@@ -491,18 +500,18 @@ callMediaType:(TUICallMediaType)callMediaType
 }
 
 - (void)onUserNetworkQualityChanged:(nonnull NSArray<TUINetworkQualityInfo *> *)networkQualityList {
-    
+
 }
 
 - (void)onCallReceived:(nonnull NSString *)callerId
-          calleeIdList:(nonnull NSArray<NSString *> *)calleeIdList
-               groupId:(NSString *)groupId
-         callMediaType:(TUICallMediaType)callMediaType
-              userData:(NSString *)userData {
+        calleeIdList:(nonnull NSArray<NSString *> *)calleeIdList
+        groupId:(NSString *)groupId
+        callMediaType:(TUICallMediaType)callMediaType
+        userData:(NSString *)userData {
     if (![TUICallingCommon checkArrayValid:calleeIdList]) {
         return;
     }
-    
+
     NSMutableArray *userArray = [NSMutableArray arrayWithArray:calleeIdList];
     [userArray addObject:callerId];
     [userArray removeObject:[TUILogin getUserID]];
@@ -515,14 +524,14 @@ callMediaType:(TUICallMediaType)callMediaType
     }
     [self.callingViewManager createCallingView:callMediaType callRole:TUICallRoleCalled callScene:callScene];
     [self callStart:calleeIdList type:callMediaType role:TUICallRoleCalled];
-    
+
     NSMutableArray *allUserIdList = [NSMutableArray arrayWithArray:calleeIdList];
     if ((callScene != TUICallSceneSingle) && callerId) {
         [allUserIdList addObject:callerId];
     }
-    
+
     [self updateCallingView:calleeIdList callScene:callScene sponsor:callerId];
-    
+
     if ((UIApplicationStateActive == [UIApplication sharedApplication].applicationState) &&
         [TUICallingCommon checkAuthorizationStatusIsDenied:callMediaType]) {
         [self showAuthorizationAlert:callMediaType];
@@ -536,17 +545,17 @@ callMediaType:(TUICallMediaType)callMediaType
 - (void)onCallBegin:(nonnull TUIRoomId *)roomId callMediaType:(TUICallMediaType)callMediaType callRole:(TUICallRole)callRole {
     [self stopAudio];
     [TUICallingStatusManager shareInstance].callStatus = TUICallStatusAccept;
-    
+
     if (!self.timerName.length) {
         [self startTimer];
     }
-    
+
     [self enableAutoLockScreen:NO];
 }
 
 - (void)onCallEnd:(nonnull TUIRoomId *)roomId
-    callMediaType:(TUICallMediaType)callMediaType
-         callRole:(TUICallRole)callRole
+        callMediaType:(TUICallMediaType)callMediaType
+        callRole:(TUICallRole)callRole
         totalTime:(float)totalTime {
     [self callEnd];
 }
@@ -563,9 +572,9 @@ callMediaType:(TUICallMediaType)callMediaType
     if (!(userId && [userId isKindOfClass:NSString.class] && userId.length > 0)) {
         return;
     }
-    
+
     CallingUserModel *userModel = [TUICallingUserManager getUser:userId];
-    
+
     if (userModel) {
         userModel.isEnter = YES;
         [TUICallingUserManager removeUser:userId];
@@ -573,7 +582,7 @@ callMediaType:(TUICallMediaType)callMediaType
         [self handleUserLeaveToast:userModel reason:removeReason];
         return;
     }
-    
+
     __weak typeof(self) weakSelf = self;
     [[V2TIMManager sharedInstance] getUsersInfo:@[userId] succ:^(NSArray<V2TIMUserFullInfo *> *infoList) {
         __strong typeof(self) strongSelf = weakSelf;
@@ -605,7 +614,7 @@ callMediaType:(TUICallMediaType)callMediaType
         default:
             break;
     }
-    
+
     if (toast && toast.length > 0) {
         NSString *userStr = userModel.name ?: userModel.userId;
         toast = [NSString stringWithFormat:@"%@ %@", userStr, toast];
@@ -647,7 +656,7 @@ callMediaType:(TUICallMediaType)callMediaType
 - (void)appDidBecomeActive {
     if ([TUICallingStatusManager shareInstance].callStatus != TUICallStatusNone) {
         [self showCallKitView];
-        
+
         if ((TUICallStatusWaiting == [TUICallingStatusManager shareInstance].callStatus) &&
             [TUICallingCommon checkAuthorizationStatusIsDenied:[TUICallingStatusManager shareInstance].callMediaType]) {
             [self showAuthorizationAlert:[TUICallingStatusManager shareInstance].callMediaType];
@@ -696,17 +705,17 @@ callMediaType:(TUICallMediaType)callMediaType
     [[TUICallEngine createInstance] init:[TUILogin getSdkAppID] userId:[TUILogin getUserID] userSig:[TUILogin getUserSig] succ:^{
     } fail:^(int code, NSString *errMsg) {
     }];
-    
+
     TUIVideoEncoderParams *videoEncoderParams = [[TUIVideoEncoderParams alloc] init];
     videoEncoderParams.resolution = TUIVideoEncoderParamsResolution_640_360;
     videoEncoderParams.resolutionMode = TUIVideoEncoderParamsResolutionModePortrait;
     [[TUICallEngine createInstance] setVideoEncoderParams:videoEncoderParams succ:nil fail:nil];
-    
+
     TUIVideoRenderParams *videoRenderParams = [[TUIVideoRenderParams alloc] init];
     videoRenderParams.fillMode = TUIVideoRenderParamsFillModeFill;
     videoRenderParams.rotation = TUIVideoRenderParamsRotation_0;
     [[TUICallEngine createInstance] setVideoRenderParams:[TUILogin getUserID] params:videoRenderParams succ:nil fail:nil];
-    
+
     TXBeautyManager *beauty = [[[TUICallEngine createInstance] getTRTCCloudInstance] getBeautyManager];
     [beauty setBeautyStyle:TXBeautyStyleNature];
     [beauty setBeautyLevel:6];
@@ -729,21 +738,21 @@ callMediaType:(TUICallMediaType)callMediaType
     if ([UIApplication sharedApplication].applicationState == UIApplicationStateActive) {
         [self showCallKitView];
     }
-    
+
     if (self.enableMuteMode) {
         return;
     }
-    
+
     if (role == TUICallRoleCall) {
         playAudio(CallingAudioTypeDial);
         return;
     }
-    
+
     if ([UIApplication sharedApplication].applicationState == UIApplicationStateBackground) {
         self.needContinuePlaying = YES;
         return;
     }
-    
+
     [self playAudioToCalled];
 }
 
@@ -810,24 +819,27 @@ callMediaType:(TUICallMediaType)callMediaType
 
 - (TUICallScene)getCallScene:(NSArray <NSString *> *)userList {
     if (self.groupID && self.groupID.length > 0) {
+        if (userList && [userList isKindOfClass:NSArray.class] && userList.count == 1 && self.isSingleChat) {
+            return TUICallSceneSingle;
+        }
         return TUICallSceneGroup;
     }
-    
+
     if (userList && [userList isKindOfClass:NSArray.class] && userList.count  >= 2) {
         return TUICallSceneMulti;
     }
-    
+
     return TUICallSceneSingle;
 }
 
 - (void)showAuthorizationAlert:(TUICallMediaType)callMediaType {
     AVAuthorizationStatus statusVideo = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
     AuthorizationDeniedType deniedType = AuthorizationDeniedTypeAudio;
-    
+
     if ((callMediaType == TUICallMediaTypeVideo) && (statusVideo == AVAuthorizationStatusDenied)) {
         deniedType = AuthorizationDeniedTypeVideo;
     }
-    
+
     [TUICallingCommon showAuthorizationAlert:deniedType openSettingHandler:^{
         [[TUICallEngine createInstance] hangup:nil fail:nil];
     } cancelHandler:^{

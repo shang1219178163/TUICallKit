@@ -127,9 +127,17 @@ class TUICallKitManager {
             FlutterResultUtils.handleMethod(code: .paramNotFound, methodName: "groupCall", paramKey: callMediaTypeKey, result: result)
             return 
         }
-                
+
+
+        var isSingleChat = false;
+
+        let isSingleChatKey = "isSingleChat"
+        if let isSingleChatVal = MethodUtils.getMethodParams(call: call, key: isSingleChatKey, resultType: Bool.self) {
+            isSingleChat = isSingleChatVal;
+        }
+
         guard let callMediaType = TUICallMediaType(rawValue: callMediaTypeInt) else { return }
-        
+
         let params = TUICallParams()
         let offlinePushInfo = TUIOfflinePushInfo()
         let paramsKey = "params"
@@ -164,17 +172,21 @@ class TUICallKitManager {
                 }
                 params.offlinePushInfo = offlinePushInfo
             }
-            
+
             if let timeout =  paramsDic["timeout"] as? Int32 {
                 params.timeout = timeout
             }
-            
+
             if let userData = paramsDic["userData"] as? String {
                 params.userData = userData
             }
         }
 
-        callkit.groupCall(groupId: groupId, userIdList: userIdList, callMediaType: callMediaType, params: params) {
+        callkit.groupCall(groupId: groupId,
+                          userIdList: userIdList,
+                          callMediaType: callMediaType,
+                          isSingleChat: isSingleChat,
+                          params: params) {
             result(NSNumber(value: 0))
         }
     }
